@@ -5,17 +5,24 @@ const runBtn = document.getElementById("run");
 const saveBtn = document.getElementById("save");
 const exportSheetBtn = document.getElementById("exportSheet");
 const sheetUrlInput = document.getElementById("sheetUrl");
+const addAnkiBtn = document.getElementById("addAnki");
+const ankiDeckInput = document.getElementById("ankiDeck");
+const exportBothBtn = document.getElementById("exportBoth");
 const wakeBox = document.getElementById("wake");
 const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
 
 let rows = [];
 
-chrome.storage.local.get("sheetUrl", (v) => {
+chrome.storage.local.get(["sheetUrl", "ankiDeck"], (v) => {
   if (v.sheetUrl) sheetUrlInput.value = v.sheetUrl;
+  if (v.ankiDeck) ankiDeckInput.value = v.ankiDeck;
 });
 sheetUrlInput.addEventListener("change", () => {
   chrome.storage.local.set({ sheetUrl: sheetUrlInput.value.trim() });
+});
+ankiDeckInput.addEventListener("change", () => {
+  chrome.storage.local.set({ ankiDeck: ankiDeckInput.value.trim() });
 });
 
 // ---------------------------------------------------------------------------
@@ -175,6 +182,8 @@ async function harvest() {
   runBtn.disabled = true;
   saveBtn.disabled = true;
   exportSheetBtn.disabled = true;
+  addAnkiBtn.disabled = true;
+  exportBothBtn.disabled = true;
   logEl.textContent = "";
   rows = [];
 
@@ -234,6 +243,8 @@ async function harvest() {
   runBtn.disabled = false;
   saveBtn.disabled = rows.length === 0;
   exportSheetBtn.disabled = rows.length === 0;
+  addAnkiBtn.disabled = rows.length === 0;
+  exportBothBtn.disabled = rows.length === 0;
 }
 
 function toCSV(data) {
@@ -258,36 +269,101 @@ function save() {
 // POSTs to an Apps Script web app bound to the destination sheet (see
 // sheet-webhook.gs). The script owns dedup — it reads column A, skips any
 // word already there, and appends only what's new, so repeated exports
-// across sessions accumulate into one clean master list.
-async function exportToSheet() {
+// across sessions accumulate into one clean master list. Returns a status
+// string on success, throws on failure — callers decide how to show that.
+async function pushToSheet() {
   const url = sheetUrlInput.value.trim();
-  if (!url) {
-    statusEl.textContent = "Set an Apps Script Web App URL under “Sheet destination” first.";
-    return;
-  }
-
-  exportSheetBtn.disabled = true;
-  statusEl.textContent = "Exporting to Sheet...";
+  if (!url) throw new Error("set an Apps Script Web App URL under “Sheet destination” first");
 
   const payload = rows.filter((r) => r.definition).map((r) => ({ word: r.word, definition: r.definition }));
 
+  const res = await fetch(url, {
+    method: "POST",
+    // text/plain avoids a CORS preflight, which Apps Script web apps don't handle.
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ rows: payload }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  return `Sheet: ${data.added} added, ${data.skipped} duplicate${data.skipped === 1 ? "" : "s"} skipped.`;
+}
+
+// Talks to AnkiConnect (localhost:8765) — a local add-on that must already be
+// running inside an open Anki window. Duplicate notes (same Front field, same
+// deck) are skipped automatically, so re-running this on the whole growing
+// list each session is safe.
+async function ankiCall(action, params) {
+  const res = await fetch("http://127.0.0.1:8765", {
+    method: "POST",
+    body: JSON.stringify({ action, version: 6, params }),
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.result;
+}
+
+async function pushToAnki() {
+  const deckName = ankiDeckInput.value.trim() || "Default";
+
+  const notes = rows
+    .filter((r) => r.definition)
+    .map((r) => ({
+      deckName,
+      modelName: "Basic (and reversed card)",
+      fields: { Front: r.word, Back: r.definition },
+      options: { allowDuplicate: false, duplicateScope: "deck" },
+      tags: ["definition-harvester"],
+    }));
+
+  await ankiCall("createDeck", { deck: deckName });
+  const result = await ankiCall("addNotes", { notes });
+  const added = result.filter((id) => id !== null).length;
+  const skipped = result.length - added;
+  return `Anki: ${added} added, ${skipped} duplicate${skipped === 1 ? "" : "s"} skipped.`;
+}
+
+async function exportToSheet() {
+  exportSheetBtn.disabled = true;
+  statusEl.textContent = "Exporting to Sheet...";
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      // text/plain avoids a CORS preflight, which Apps Script web apps don't handle.
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ rows: payload }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    statusEl.textContent = `Sheet: ${data.added} added, ${data.skipped} duplicate${data.skipped === 1 ? "" : "s"} skipped.`;
+    statusEl.textContent = await pushToSheet();
   } catch (e) {
     statusEl.textContent = "Sheet export failed: " + e.message;
   }
+  exportSheetBtn.disabled = rows.length === 0;
+}
+
+async function addToAnki() {
+  addAnkiBtn.disabled = true;
+  statusEl.textContent = "Adding to Anki...";
+  try {
+    statusEl.textContent = await pushToAnki();
+  } catch (e) {
+    statusEl.textContent = "Anki add failed — is Anki open with AnkiConnect installed? (" + e.message + ")";
+  }
+  addAnkiBtn.disabled = rows.length === 0;
+}
+
+async function exportBoth() {
+  exportSheetBtn.disabled = true;
+  addAnkiBtn.disabled = true;
+  exportBothBtn.disabled = true;
+  statusEl.textContent = "Exporting to Sheet and Anki...";
+
+  const [sheet, anki] = await Promise.allSettled([pushToSheet(), pushToAnki()]);
+  const messages = [
+    sheet.status === "fulfilled" ? sheet.value : "Sheet failed: " + sheet.reason.message,
+    anki.status === "fulfilled" ? anki.value : "Anki failed: " + anki.reason.message,
+  ];
+  statusEl.textContent = messages.join(" ");
 
   exportSheetBtn.disabled = rows.length === 0;
+  addAnkiBtn.disabled = rows.length === 0;
+  exportBothBtn.disabled = rows.length === 0;
 }
 
 runBtn.addEventListener("click", harvest);
 saveBtn.addEventListener("click", save);
 exportSheetBtn.addEventListener("click", exportToSheet);
+addAnkiBtn.addEventListener("click", addToAnki);
+exportBothBtn.addEventListener("click", exportBoth);

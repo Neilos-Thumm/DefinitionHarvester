@@ -2,9 +2,9 @@
   "manifest_version": 3,
   "name": "Definition Harvester",
   "version": "1.0",
-  "description": "Pulls the word and its AI Overview definition from every Google tab in this window, as CSV or a synced Google Sheet.",
+  "description": "Pulls the word and its AI Overview definition from every Google tab in this window, as CSV, a synced Google Sheet, or straight into Anki.",
   "permissions": ["tabs", "scripting", "storage"],
-  "host_permissions": ["*://www.google.com/*", "*://www.google.com.au/*", "*://script.google.com/*"],
+  "host_permissions": ["*://www.google.com/*", "*://www.google.com.au/*", "*://script.google.com/*", "http://127.0.0.1:8765/*"],
   "action": {
     "default_title": "Definition Harvester",
     "default_popup": "popup.html"
