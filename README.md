@@ -13,6 +13,8 @@ For each Google search tab in the window, it extracts a definition using the fir
 
 Tabs that are asleep (discarded by Chrome to save memory) are skipped by default, since reading them would require reloading the tab and losing anything selected — check "Wake sleeping tabs" to reload them anyway.
 
+<video src="demo/demo.mov" controls width="100%"></video>
+
 ## Files
 
 | File | Purpose |
