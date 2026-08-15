@@ -3,11 +3,20 @@
 
 const runBtn = document.getElementById("run");
 const saveBtn = document.getElementById("save");
+const exportSheetBtn = document.getElementById("exportSheet");
+const sheetUrlInput = document.getElementById("sheetUrl");
 const wakeBox = document.getElementById("wake");
 const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
 
 let rows = [];
+
+chrome.storage.local.get("sheetUrl", (v) => {
+  if (v.sheetUrl) sheetUrlInput.value = v.sheetUrl;
+});
+sheetUrlInput.addEventListener("change", () => {
+  chrome.storage.local.set({ sheetUrl: sheetUrlInput.value.trim() });
+});
 
 // ---------------------------------------------------------------------------
 // Injected into every frame of a tab. Deliberately dumb: it grabs the two raw
@@ -165,6 +174,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function harvest() {
   runBtn.disabled = true;
   saveBtn.disabled = true;
+  exportSheetBtn.disabled = true;
   logEl.textContent = "";
   rows = [];
 
@@ -223,12 +233,15 @@ async function harvest() {
   statusEl.textContent = parts.join(", ") + ".";
   runBtn.disabled = false;
   saveBtn.disabled = rows.length === 0;
+  exportSheetBtn.disabled = rows.length === 0;
 }
 
 function toCSV(data) {
   const q = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const head = ["word", "definition", "source", "url"].map(q).join(",");
-  const body = data.map((r) => [r.word, r.definition, r.source, r.url].map(q).join(","));
+  const head = ["word", "definition"].map(q).join(",");
+  const body = data
+    .filter((r) => r.definition)
+    .map((r) => [r.word, r.definition].map(q).join(","));
   // BOM keeps accented characters intact when Excel opens it.
   return "\uFEFF" + [head, ...body].join("\r\n");
 }
@@ -242,5 +255,39 @@ function save() {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
+// POSTs to an Apps Script web app bound to the destination sheet (see
+// sheet-webhook.gs). The script owns dedup — it reads column A, skips any
+// word already there, and appends only what's new, so repeated exports
+// across sessions accumulate into one clean master list.
+async function exportToSheet() {
+  const url = sheetUrlInput.value.trim();
+  if (!url) {
+    statusEl.textContent = "Set an Apps Script Web App URL under “Sheet destination” first.";
+    return;
+  }
+
+  exportSheetBtn.disabled = true;
+  statusEl.textContent = "Exporting to Sheet...";
+
+  const payload = rows.filter((r) => r.definition).map((r) => ({ word: r.word, definition: r.definition }));
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      // text/plain avoids a CORS preflight, which Apps Script web apps don't handle.
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ rows: payload }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    statusEl.textContent = `Sheet: ${data.added} added, ${data.skipped} duplicate${data.skipped === 1 ? "" : "s"} skipped.`;
+  } catch (e) {
+    statusEl.textContent = "Sheet export failed: " + e.message;
+  }
+
+  exportSheetBtn.disabled = rows.length === 0;
+}
+
 runBtn.addEventListener("click", harvest);
 saveBtn.addEventListener("click", save);
+exportSheetBtn.addEventListener("click", exportToSheet);

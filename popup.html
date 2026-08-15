@@ -51,6 +51,27 @@
     font-size: 11px;
     cursor: pointer;
   }
+  details.dest {
+    margin-top: 10px;
+    color: var(--dim);
+    font-size: 11px;
+  }
+  details.dest summary {
+    cursor: pointer;
+    user-select: none;
+  }
+  details.dest input {
+    width: 100%;
+    margin-top: 6px;
+    padding: 6px 8px;
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font: inherit;
+    font-size: 11px;
+  }
+  details.dest input:focus-visible { outline: 2px solid var(--ok); outline-offset: 1px; }
   #status {
     margin: 12px 0 0;
     padding-top: 10px;
@@ -90,6 +111,15 @@
     <button id="run" class="go">Harvest this window</button>
     <button id="save" disabled>Save CSV</button>
   </div>
+
+  <div class="row" style="margin-top: 8px;">
+    <button id="exportSheet" disabled>Export to Sheet</button>
+  </div>
+
+  <details class="dest">
+    <summary>Sheet destination</summary>
+    <input id="sheetUrl" type="text" placeholder="Apps Script Web App URL">
+  </details>
 
   <label class="wake">
     <input type="checkbox" id="wake"> Wake sleeping tabs (reloads them — highlight is lost)
