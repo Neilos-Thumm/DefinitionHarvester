@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #16161a;
+    --ink: #e8e6e3;
+    --dim: #8a8780;
+    --line: #2a2a30;
+    --ok: #7fb069;
+    --warn: #d9a441;
+    --miss: #c25b4e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    width: 380px;
+    margin: 0;
+    padding: 14px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.45 ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  h1 {
+    margin: 0 0 2px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .sub { color: var(--dim); margin-bottom: 12px; font-size: 11px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  button {
+    flex: 1;
+    padding: 8px 10px;
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    font: inherit;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--dim); }
+  button:focus-visible { outline: 2px solid var(--ok); outline-offset: 1px; }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.go { border-color: var(--ok); color: var(--ok); }
+  label.wake {
+    display: block;
+    margin: 10px 0 0;
+    color: var(--dim);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  #status {
+    margin: 12px 0 0;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    color: var(--dim);
+    font-size: 11px;
+    min-height: 15px;
+  }
+  #log {
+    margin-top: 8px;
+    max-height: 210px;
+    overflow-y: auto;
+    font-size: 11px;
+  }
+  #log div {
+    padding: 3px 0;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .t-ok  { color: var(--ok); }
+  .t-partial { color: var(--warn); }
+  .t-miss { color: var(--miss); }
+  .word { color: var(--ink); }
+  @media (prefers-reduced-motion: no-preference) {
+    #log div { animation: in 120ms ease-out; }
+    @keyframes in { from { opacity: 0; } to { opacity: 1; } }
+  }
+</style>
+</head>
+<body>
+  <h1>Definition Harvester</h1>
+  <div class="sub">Reads every Google tab in this window.</div>
+
+  <div class="row">
+    <button id="run" class="go">Harvest this window</button>
+    <button id="save" disabled>Save CSV</button>
+  </div>
+
+  <label class="wake">
+    <input type="checkbox" id="wake"> Wake sleeping tabs (reloads them — highlight is lost)
+  </label>
+
+  <div id="status">Keep this popup open while it runs.</div>
+  <div id="log"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

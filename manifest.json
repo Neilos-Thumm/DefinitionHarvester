@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Definition Harvester",
+  "version": "1.0",
+  "description": "Pulls the word and its AI Overview definition from every Google tab in this window, as CSV.",
+  "permissions": ["tabs", "scripting"],
+  "host_permissions": ["*://www.google.com/*", "*://www.google.com.au/*"],
+  "action": {
+    "default_title": "Definition Harvester",
+    "default_popup": "popup.html"
+  }
+}
