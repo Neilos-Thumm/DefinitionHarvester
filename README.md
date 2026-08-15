@@ -14,7 +14,10 @@ For each Google search tab in the window, it extracts a definition using the fir
 Tabs that are asleep (discarded by Chrome to save memory) are skipped by default, since reading them would require reloading the tab and losing anything selected — check "Wake sleeping tabs" to reload them anyway.
 
 <video src="demo/demo.mov" controls width="100%"></video>
-https://github.com/user-attachments/assets/eb96e300-1536-479a-8711-b81ccdd6436f
+
+
+https://github.com/user-attachments/assets/d690ba0a-18b0-4525-a72b-9ac031d3608c
+
 
 ## Files
 
