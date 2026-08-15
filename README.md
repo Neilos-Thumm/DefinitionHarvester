@@ -2,23 +2,6 @@
 
 A Chrome extension that scans every Google search tab open in the current window, pulls the word and its AI Overview definition out of each one, and lets you send the results to a CSV file, a Google Sheet, and/or Anki.
 
-## Requirements
-
-| Always needed | Only for Google Sheets export | Only for Anki export |
-|---|---|---|
-| Google Chrome (or another Chromium-based browser — Edge, Brave, etc.) | A Google account | The [Anki](https://apps.ankiweb.net/) desktop app, installed and running |
-| A Google account (to run searches with AI Overviews) | — | The [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on, installed inside Anki |
-
-No Node.js, no build step, no package manager — the extension is loaded straight from source (see [Install](#1-install-the-extension) below), and there's nothing to `npm install`.
-
-## Tech stack
-
-- **Extension**: Chrome Extension **Manifest V3** — vanilla HTML/CSS/JavaScript, no framework, no bundler. UI lives entirely in `popup.html` + `popup.js`.
-- **Chrome APIs used**: `chrome.tabs` (finding Google search tabs in the window), `chrome.scripting` (injecting the extraction function into each tab), `chrome.storage.local` (persisting your Sheet URL / Anki deck name between popup sessions).
-- **Sheets integration**: [Google Apps Script](https://www.google.com/script/start/) (`sheet-webhook.gs`), deployed as a Web App that the extension talks to over plain `fetch`/JSON — no Google Cloud project, no OAuth client, no external libraries.
-- **Anki integration**: [AnkiConnect](https://foosoft.net/projects/anki-connect/)'s local JSON-RPC-over-HTTP API (`127.0.0.1:8765`), called directly from the popup with `fetch`.
-- **Dependencies**: none. No `package.json`, no third-party JS libraries anywhere in the extension itself.
-
 ## How it works
 
 For each Google search tab in the window, it extracts a definition using the first of these that succeeds:
@@ -37,6 +20,16 @@ Tabs that are asleep (discarded by Chrome to save memory) are skipped by default
 | `manifest.json` | Extension config: permissions, which sites it can run on |
 | `popup.html` / `popup.js` | The popup UI and all extraction/export logic |
 | `sheet-webhook.gs` | Apps Script code you paste into your Google Sheet (see setup below) |
+
+
+## Requirements
+
+| Always needed | Only for Google Sheets export | Only for Anki export |
+|---|---|---|
+| Google Chrome (or another Chromium-based browser — Edge, Brave, etc.) | A Google account | The [Anki](https://apps.ankiweb.net/) desktop app, installed and running |
+| A Google account (to run searches with AI Overviews) | — | The [AnkiConnect](https://ankiweb.net/shared/info/2055492159) add-on, installed inside Anki |
+
+No Node.js, no build step, no package manager — the extension is loaded straight from source (see [Install](#1-install-the-extension) below), and there's nothing to `npm install`.
 
 ---
 
@@ -149,3 +142,12 @@ Anki remembers the field mapping after the first time, and dedupes by the Front 
 | Words land in an unexpected "Default" deck in Anki | The **Anki deck** field was left blank — see step 4 above |
 | "Sheet export failed: HTTP 401/403" or similar | The Apps Script deployment's "Who has access" isn't set to "Anyone with the link", or the URL was copied wrong (must end in `/exec`, not `/dev`) |
 | A tab is skipped with "— asleep" | Chrome discarded that tab to save memory; check **Wake sleeping tabs** to reload and read it (this loses any manual text selection on that tab) |
+
+## Tech stack
+
+- **Extension**: Chrome Extension **Manifest V3** — vanilla HTML/CSS/JavaScript, no framework, no bundler. UI lives entirely in `popup.html` + `popup.js`.
+- **Chrome APIs used**: `chrome.tabs` (finding Google search tabs in the window), `chrome.scripting` (injecting the extraction function into each tab), `chrome.storage.local` (persisting your Sheet URL / Anki deck name between popup sessions).
+- **Sheets integration**: [Google Apps Script](https://www.google.com/script/start/) (`sheet-webhook.gs`), deployed as a Web App that the extension talks to over plain `fetch`/JSON — no Google Cloud project, no OAuth client, no external libraries.
+- **Anki integration**: [AnkiConnect](https://foosoft.net/projects/anki-connect/)'s local JSON-RPC-over-HTTP API (`127.0.0.1:8765`), called directly from the popup with `fetch`.
+- **Dependencies**: none. No `package.json`, no third-party JS libraries anywhere in the extension itself.
+
