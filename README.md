@@ -2,6 +2,9 @@
 
 A Chrome extension that scans every Google search tab open in the current window, pulls the word and its AI Overview definition out of each one, and lets you send the results to a CSV file, a Google Sheet, and/or Anki.
 
+This plugin served as the final development/enhancement from the predecessor App Scripts [Vocab Apps Scripts](https://github.com/Neilos-Thumm/vocab-apps-script)  
+It can also be used as a RaspberryPi-free and LLM-free alternative to [Vocapture](https://github.com/Neilos-Thumm/Vocapture)
+
 ## How it works
 
 For each Google search tab in the window, it extracts a definition using the first of these that succeeds:
