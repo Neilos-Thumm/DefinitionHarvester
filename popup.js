@@ -11,18 +11,53 @@ const exportBothBtn = document.getElementById("exportBoth");
 const wakeBox = document.getElementById("wake");
 const statusEl = document.getElementById("status");
 const logEl = document.getElementById("log");
+const bookNameInput = document.getElementById("bookName");
+const bookNameList = document.getElementById("bookNameList");
+const chapterInput = document.getElementById("chapter");
 
 let rows = [];
 
-chrome.storage.local.get(["sheetUrl", "ankiDeck"], (v) => {
+// Sheet-only book-name autocomplete history. Populated from prior Sheet
+// exports; never read by toCSV()/pushToAnki(), so CSV/Anki stay unaffected.
+function renderBookNameList(names) {
+  bookNameList.innerHTML = "";
+  for (const name of names) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    bookNameList.appendChild(opt);
+  }
+}
+
+function rememberBookName(name) {
+  chrome.storage.local.get(["bookNames"], (v) => {
+    const list = Array.isArray(v.bookNames) ? v.bookNames : [];
+    const key = name.toLowerCase();
+    if (!list.some((n) => n.toLowerCase() === key)) {
+      list.push(name);
+      chrome.storage.local.set({ bookNames: list });
+      renderBookNameList(list);
+    }
+  });
+}
+
+chrome.storage.local.get(["sheetUrl", "ankiDeck", "bookName", "chapter", "bookNames"], (v) => {
   if (v.sheetUrl) sheetUrlInput.value = v.sheetUrl;
   if (v.ankiDeck) ankiDeckInput.value = v.ankiDeck;
+  if (v.bookName) bookNameInput.value = v.bookName;
+  if (v.chapter) chapterInput.value = v.chapter;
+  renderBookNameList(v.bookNames || []);
 });
 sheetUrlInput.addEventListener("change", () => {
   chrome.storage.local.set({ sheetUrl: sheetUrlInput.value.trim() });
 });
 ankiDeckInput.addEventListener("change", () => {
   chrome.storage.local.set({ ankiDeck: ankiDeckInput.value.trim() });
+});
+bookNameInput.addEventListener("change", () => {
+  chrome.storage.local.set({ bookName: bookNameInput.value.trim() });
+});
+chapterInput.addEventListener("change", () => {
+  chrome.storage.local.set({ chapter: chapterInput.value.trim() });
 });
 
 // ---------------------------------------------------------------------------
@@ -277,15 +312,22 @@ async function pushToSheet() {
 
   const payload = rows.filter((r) => r.definition).map((r) => ({ word: r.word, definition: r.definition }));
 
+  const book = bookNameInput.value.trim();
+  const chapter = chapterInput.value.trim();
+  const body = { rows: payload };
+  if (book) body.separator = { book, chapter };
+
   const res = await fetch(url, {
     method: "POST",
     // text/plain avoids a CORS preflight, which Apps Script web apps don't handle.
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ rows: payload }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
-  return `Sheet: ${data.added} added, ${data.skipped} duplicate${data.skipped === 1 ? "" : "s"} skipped.`;
+  if (book) rememberBookName(book);
+  const label = data.separatorLabel ? ` [${data.separatorLabel}]` : "";
+  return `Sheet: ${data.added} added, ${data.skipped} duplicate${data.skipped === 1 ? "" : "s"} skipped.${label}`;
 }
 
 // Talks to AnkiConnect (localhost:8765) — a local add-on that must already be

@@ -43,11 +43,41 @@ function doPost(e) {
     added++;
   }
 
+  // Optional separator row: "Book", "Book — Chapter", or with " — Part N"
+  // appended if this same Book(+Chapter) has already been exported before.
+  // Written to column B only (column A left blank), immediately before this
+  // batch's own rows, styled dark red + bold on that single cell only.
+  let separatorLabel = "";
+  const sep = body.separator;
+  const sepBook = sep && String(sep.book || "").trim();
+  if (sepBook) {
+    const sepChapter = String(sep.chapter || "").trim();
+    const prefix = sepChapter ? `${sepBook} — ${sepChapter}` : sepBook;
+    const colB = sheet.getLastRow() > 0
+      ? sheet.getRange(1, 2, sheet.getLastRow(), 1).getValues().flat().map((v) => String(v).trim())
+      : [];
+    const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const partPattern = new RegExp(`^${escaped}(?: — Part \\d+)?$`);
+    const priorParts = colB.filter((v) => partPattern.test(v)).length;
+
+    separatorLabel = priorParts === 0 ? prefix : `${prefix} — Part ${priorParts + 1}`;
+    sheet.getRange(sheet.getLastRow() + 1, 2, 1, 1)
+      .setValue(separatorLabel)
+      .setFontColor("#d43f3f")
+      .setFontWeight("bold");
+  }
+
   if (toAppend.length) {
-    sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, 2).setValues(toAppend);
+    // Explicitly reset formatting — Sheets sometimes auto-extends the
+    // separator row's red/bold styling into new rows written directly
+    // below it, so word rows must clear that back to normal every time.
+    sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, 2)
+      .setValues(toAppend)
+      .setFontColor(null)
+      .setFontWeight("normal");
   }
 
   return ContentService.createTextOutput(
-    JSON.stringify({ added, skipped, total: sheet.getLastRow() - 1 })
+    JSON.stringify({ added, skipped, total: sheet.getLastRow() - 1, separatorLabel })
   ).setMimeType(ContentService.MimeType.JSON);
 }

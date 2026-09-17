@@ -1,6 +1,6 @@
 # Definition Harvester
 
-A Chrome extension that scans every Google search tab open in the current window, pulls the word and its AI Overview definition out of each one, and lets you send the results to a CSV file, a Google Sheet, and/or Anki.
+A Chrome extension that scans every Google search tab open in the current window, pulls the word and its AI Overview definition out of each one, and lets you send the results to a CSV file, a Google Sheet (optionally grouped by book/chapter), and/or Anki.
 
 This plugin served as the final development/enhancement from the predecessor App Scripts [Vocab Apps Scripts](https://github.com/Neilos-Thumm/vocab-apps-script)  
 It can also be used as a RaspberryPi-free and LLM-free alternative to [Vocapture](https://github.com/Neilos-Thumm/Vocapture)
@@ -86,6 +86,19 @@ This uses a small Google Apps Script "web app" bound to your own Sheet — the e
 
 Click **Export to Sheet** any time after a harvest. The script reads column A, skips anything already there (case-insensitive), and appends only new words — so re-exporting your full running list every session is always safe.
 
+### Optional: group exports by book/chapter
+
+If you're harvesting words while reading, open the **Book / Chapter separator** section in the popup and fill in a **Book name** and, optionally, a **Chapter**. Both fields:
+
+- Persist between popup sessions, exactly like the Sheet URL and Anki deck fields.
+- The Book name field also offers autocomplete, suggesting any book you've typed before.
+
+When Book name has a value, clicking **Export to Sheet** inserts one extra row directly above that batch's words — column A is left blank, and column B holds a label like `Sicilian Nights` (title only) or `Sicilian Nights — Ch. 4` (title + chapter), styled dark red and bold so it stands out from the word rows. Export another batch under the same book (and chapter) and the label is bumped automatically — `— Part 2`, `— Part 3`, and so on. That numbering is computed by scanning the sheet itself, not tracked locally, so it stays correct even across browsers or reinstalls.
+
+Leave Book name blank and exports behave exactly as before — no separator row is added.
+
+This only affects the Sheet export path — **Save CSV** and **Add to Anki** read the same harvested word list but never see the Book/Chapter fields, so they're unaffected either way.
+
 ---
 
 ## 4. Configure Anki export (optional)
@@ -155,7 +168,7 @@ Anki remembers the field mapping after the first time, and dedupes by the Front 
 ## Tech stack
 
 - **Extension**: Chrome Extension **Manifest V3** — vanilla HTML/CSS/JavaScript, no framework, no bundler. UI lives entirely in `popup.html` + `popup.js`.
-- **Chrome APIs used**: `chrome.tabs` (finding Google search tabs in the window), `chrome.scripting` (injecting the extraction function into each tab), `chrome.storage.local` (persisting your Sheet URL / Anki deck name between popup sessions).
+- **Chrome APIs used**: `chrome.tabs` (finding Google search tabs in the window), `chrome.scripting` (injecting the extraction function into each tab), `chrome.storage.local` (persisting your Sheet URL / Anki deck name / Book name / Chapter between popup sessions, plus a running history of book names for autocomplete).
 - **Sheets integration**: [Google Apps Script](https://www.google.com/script/start/) (`sheet-webhook.gs`), deployed as a Web App that the extension talks to over plain `fetch`/JSON — no Google Cloud project, no OAuth client, no external libraries.
 - **Anki integration**: [AnkiConnect](https://foosoft.net/projects/anki-connect/)'s local JSON-RPC-over-HTTP API (`127.0.0.1:8765`), called directly from the popup with `fetch`.
 - **Dependencies**: none. No `package.json`, no third-party JS libraries anywhere in the extension itself.

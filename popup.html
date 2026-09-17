@@ -131,6 +131,13 @@
     <input id="ankiDeck" type="text" placeholder="Default">
   </details>
 
+  <details class="dest">
+    <summary>Book / Chapter separator (optional, Sheet export only)</summary>
+    <input id="bookName" type="text" placeholder="Book name" list="bookNameList" autocomplete="off">
+    <datalist id="bookNameList"></datalist>
+    <input id="chapter" type="text" placeholder="Chapter">
+  </details>
+
   <label class="wake">
     <input type="checkbox" id="wake"> Wake sleeping tabs (reloads them — highlight is lost)
   </label>
