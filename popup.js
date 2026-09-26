@@ -110,7 +110,15 @@ function grabFrame() {
   const dfn = document.querySelector('[data-dobid="dfn"]');
   if (dfn) card = clean(dfn.innerText);
 
-  return { selection, overview, mark, card };
+  // The search box's current text; reflects Google's spelling correction even
+  // when the URL's q= still holds the original typo.
+  let query = "";
+  try {
+    const box = document.querySelector('textarea[name="q"], input[name="q"]');
+    query = clean(box?.value);
+  } catch (e) {}
+
+  return { selection, overview, mark, card, query };
 }
 
 // ---------------------------------------------------------------------------
@@ -119,12 +127,15 @@ function grabFrame() {
 const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+function stripQuery(q) {
+  return clean(q)
+    .replace(/^(define|definition of|meaning of)\s+/i, "")
+    .replace(/\s+(meaning|definition|define)$/i, "");
+}
+
 function wordFromUrl(url) {
   try {
-    const q = new URL(url).searchParams.get("q") || "";
-    return clean(q)
-      .replace(/^(define|definition of|meaning of)\s+/i, "")
-      .replace(/\s+(meaning|definition|define)$/i, "");
+    return stripQuery(new URL(url).searchParams.get("q") || "");
   } catch (e) {
     return "";
   }
@@ -235,7 +246,7 @@ async function harvest() {
 
   for (const [i, tab] of targets.entries()) {
     statusEl.textContent = `Reading ${i + 1} of ${targets.length}...`;
-    const word = wordFromUrl(tab.url);
+    let word = wordFromUrl(tab.url);
 
     if (tab.discarded && !wakeBox.checked) {
       skipped++;
@@ -249,17 +260,21 @@ async function harvest() {
         func: grabFrame,
       });
       const frames = results.map((r) => r?.result).filter(Boolean);
+      const boxWord = stripQuery(frames.map((f) => f?.query).find(Boolean) || "");
+      const corrected = !!boxWord && boxWord.toLowerCase() !== word.toLowerCase();
+      if (boxWord) word = boxWord;
+      const fix = corrected ? "*" : "";
       const { definition, source } = resolve(word, frames);
 
       if (definition) {
         rows.push({ word, definition, source, url: tab.url });
-        if (source === "ai-highlight" || source === "highlight") { hi++; line(`${word} — ${definition.slice(0, 40)}`, "t-ok"); }
-        else if (source === "ai-overview") { parsed++; line(`${word} ~ ${definition.slice(0, 40)}`, "t-ok"); }
-        else { parsed++; line(`? ${word} — ${definition.slice(0, 36)}`, "t-partial"); }
+        if (source === "ai-highlight" || source === "highlight") { hi++; line(`${word}${fix} — ${definition.slice(0, 40)}`, "t-ok"); }
+        else if (source === "ai-overview") { parsed++; line(`${word}${fix} ~ ${definition.slice(0, 40)}`, "t-ok"); }
+        else { parsed++; line(`? ${word}${fix} — ${definition.slice(0, 36)}`, "t-partial"); }
       } else {
         missed++;
         rows.push({ word, definition: "", source, url: tab.url });
-        line(`✗ ${word || tab.title.slice(0, 30)}`, "t-miss");
+        line(`✗ ${word || tab.title.slice(0, 30)}${fix}`, "t-miss");
       }
     } catch (e) {
       missed++;
@@ -347,21 +362,29 @@ async function ankiCall(action, params) {
 async function pushToAnki() {
   const deckName = ankiDeckInput.value.trim() || "Default";
 
-  const notes = rows
-    .filter((r) => r.definition)
-    .map((r) => ({
-      deckName,
-      modelName: "Basic (and reversed card)",
-      fields: { Front: r.word, Back: r.definition },
-      options: { allowDuplicate: false, duplicateScope: "deck" },
-      tags: ["definition-harvester"],
-    }));
+  const withDef = rows.filter((r) => r.definition);
+  const notes = withDef.map((r) => ({
+    deckName,
+    modelName: "Basic (and reversed card)",
+    fields: { Front: r.word, Back: r.definition },
+    options: { allowDuplicate: false, duplicateScope: "deck" },
+    tags: ["definition-harvester"],
+  }));
 
   await ankiCall("createDeck", { deck: deckName });
-  const result = await ankiCall("addNotes", { notes });
-  const added = result.filter((id) => id !== null).length;
-  const skipped = result.length - added;
-  return `Anki: ${added} added, ${skipped} duplicate${skipped === 1 ? "" : "s"} skipped.`;
+  // Some AnkiConnect versions reject the entire addNotes batch when any note is
+  // a duplicate, so ask which notes are addable first and send only those.
+  const can = await ankiCall("canAddNotes", { notes });
+  const fresh = notes.filter((_, i) => can[i]);
+  const dupes = withDef.filter((_, i) => !can[i]).map((r) => r.word);
+  let added = 0;
+  if (fresh.length) {
+    const result = await ankiCall("addNotes", { notes: fresh });
+    added = result.filter((id) => id !== null).length;
+  }
+  const skipped = notes.length - added;
+  const which = dupes.length ? ` (${dupes.join(", ")})` : "";
+  return `Anki: ${added} added, ${skipped} duplicate${skipped === 1 ? "" : "s"} skipped${which}.`;
 }
 
 async function exportToSheet() {
