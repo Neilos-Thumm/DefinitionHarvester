@@ -127,10 +127,20 @@ function grabFrame() {
 const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const QUALIFIERS = "idiom|idiomatic|slang|phrase|expression|term|proverb";
+const TRIGGERS = "meaning|definition|define";
+// A qualifier is only stripped when it sits right next to a trigger word
+// (either side), never on its own — so "british idiom" or "legal term"
+// stay intact, while "X meaning idiom" / "X idiom define" reduce to "X".
+const trailingPattern = new RegExp(
+  `\\s+(?:(?:${QUALIFIERS})\\s+)?(?:${TRIGGERS})(?:\\s+(?:${QUALIFIERS}))?$`,
+  "i"
+);
+
 function stripQuery(q) {
   return clean(q)
     .replace(/^(define|definition of|meaning of)\s+/i, "")
-    .replace(/\s+(meaning|definition|define)$/i, "");
+    .replace(trailingPattern, "");
 }
 
 function wordFromUrl(url) {
