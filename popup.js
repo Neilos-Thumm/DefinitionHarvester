@@ -66,7 +66,14 @@ chapterInput.addEventListener("change", () => {
 // where it's easy to fix without touching page code.
 // ---------------------------------------------------------------------------
 function grabFrame() {
-  const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
+  // Google's AI Overview marks include invisible screen-reader text like
+  // "[Highlight start]"/"[Highlight end]" around the highlighted span —
+  // strip it before collapsing whitespace, or it leaks into the definition.
+  const clean = (s) =>
+    (s || "")
+      .replace(/\[highlight (?:start|end)\]/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
   // 1. Whatever text the user manually selected in this frame. A selection survives as long
   //    as the document isn't reloaded, so tabs you highlighted are readable.
